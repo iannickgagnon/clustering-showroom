@@ -1,0 +1,1 @@
+"""SOM configuration classes."""

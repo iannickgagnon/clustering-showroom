@@ -1,36 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
 
+from self_organizing_maps.classes.som_config import SOMConfig
 
 ArrayF = np.ndarray
 
-
-@dataclass(frozen=True)
-class SOMConfig:
-    """Configuration for training a Self-Organizing Map (SOM).
-
-    Attributes:
-        m: Number of rows in the SOM grid.
-        n: Number of columns in the SOM grid.
-        dim: Dimensionality of input vectors.
-        learning_rate: Initial learning rate.
-        sigma: Initial neighborhood radius. If None, defaults to max(m, n) / 2.
-        steps: Number of training iterations.
-        seed: Random seed for initialization and sampling.
-    """
-
-    m: int
-    n: int
-    dim: int
-    learning_rate: float = 0.5
-    sigma: Optional[float] = None
-    steps: int = 4000
-    seed: int = 0
 
 
 class SelfOrganizingMap:
@@ -51,16 +29,16 @@ class SelfOrganizingMap:
             config: Hyperparameters and training settings.
         """
         self._cfg = config
-        self._rng = np.random.default_rng(config.seed)
+        self._rng = np.random.default_rng(config.rnd_seed)
 
-        self._sigma0 = config.sigma if config.sigma is not None else max(config.m, config.n) / 2.0
-        self._lr0 = config.learning_rate
+        self._sigma0 = config.initial_neighborhood_radius if config.initial_neighborhood_radius is not None else max(config.n_rows, config.n_cols) / 2.0
+        self._lr0 = config.initial_learning_rate
 
         # Weight matrix of shape (m, n, dim).
-        self._weights: ArrayF = self._rng.normal(0.0, 1.0, size=(config.m, config.n, config.dim)).astype(float)
+        self._weights: ArrayF = self._rng.normal(0.0, 1.0, size=(config.n_rows, config.n_cols, config.input_vector_dim)).astype(float)
 
         # Precompute neuron coordinates (m, n, 2).
-        xs, ys = np.meshgrid(np.arange(config.m), np.arange(config.n), indexing="ij")
+        xs, ys = np.meshgrid(np.arange(config.n_rows), np.arange(config.n_cols), indexing="ij")
         self._coords: ArrayF = np.stack([xs, ys], axis=-1).astype(float)
 
     @property
@@ -79,7 +57,7 @@ class SelfOrganizingMap:
         Returns:
             (m, n) grid shape.
         """
-        return (self._cfg.m, self._cfg.n)
+        return (self._cfg.n_rows, self._cfg.n_cols)
 
     def fit(self, X: ArrayF) -> SelfOrganizingMap:
         """Trains the SOM on input data.
@@ -94,15 +72,15 @@ class SelfOrganizingMap:
             ValueError: If X does not have shape (N, dim).
         """
         X = np.asarray(X, dtype=float)
-        if X.ndim != 2 or X.shape[1] != self._cfg.dim:
-            raise ValueError(f"Expected X shape (N, {self._cfg.dim}), got {X.shape}")
+        if X.ndim != 2 or X.shape[1] != self._cfg.input_vector_dim:
+            raise ValueError(f"Expected X shape (N, {self._cfg.input_vector_dim}), got {X.shape}")
 
         n_samples = X.shape[0]
 
-        for t in range(self._cfg.steps):
+        for t in range(self._cfg.n_iter):
             # Exponential decay schedules.
-            lr = self._lr0 * np.exp(-t / self._cfg.steps)
-            sigma = self._sigma0 * np.exp(-t / self._cfg.steps)
+            lr = self._lr0 * np.exp(-t / self._cfg.n_iter)
+            sigma = self._sigma0 * np.exp(-t / self._cfg.n_iter)
 
             x = X[self._rng.integers(0, n_samples)]
             bmu_i, bmu_j = self._find_bmu(x)
@@ -131,8 +109,8 @@ class SelfOrganizingMap:
             ValueError: If X does not have shape (N, dim).
         """
         X = np.asarray(X, dtype=float)
-        if X.ndim != 2 or X.shape[1] != self._cfg.dim:
-            raise ValueError(f"Expected X shape (N, {self._cfg.dim}), got {X.shape}")
+        if X.ndim != 2 or X.shape[1] != self._cfg.input_vector_dim:
+            raise ValueError(f"Expected X shape (N, {self._cfg.input_vector_dim}), got {X.shape}")
 
         bmus = np.zeros((X.shape[0], 2), dtype=int)
         for idx, x in enumerate(X):
@@ -150,7 +128,7 @@ class SelfOrganizingMap:
             Occupancy matrix of shape (m, n) where each cell counts mapped points.
         """
         bmus = self.map_points(X)
-        occ = np.zeros((self._cfg.m, self._cfg.n), dtype=int)
+        occ = np.zeros((self._cfg.n_rows, self._cfg.n_cols), dtype=int)
         for i, j in bmus:
             occ[i, j] += 1
         return occ
@@ -220,13 +198,13 @@ def main() -> None:
     X = make_toy_blobs(seed=2)
 
     cfg = SOMConfig(
-        m=15,
-        n=15,
-        dim=2,
-        learning_rate=0.5,
-        sigma=6.0,
-        steps=4000,
-        seed=0,
+        n_rows=15,
+        n_cols=15,
+        input_vector_dim=2,
+        initial_learning_rate=0.5,
+        initial_neighborhood_radius=6.0,
+        n_iter=4000,
+        rnd_seed=0,
     )
 
     som = SelfOrganizingMap(cfg).fit(X)

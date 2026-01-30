@@ -22,17 +22,30 @@ class SelfOrganizingMap:
         Args:
             config (SOMConfig): Hyperparameters and training settings.
         """
+
+        # Configuration object
         self._cfg = config
+
+        # Random number generator
         self._rng = np.random.default_rng(config.rnd_seed)
 
-        self._sigma0 = config.initial_neighborhood_radius if config.initial_neighborhood_radius is not None else max(config.n_rows, config.n_cols) / 2.0
+        # Initial neighborhood radius
+        if config.initial_neighborhood_radius is not None:
+            self._sigma0 = config.initial_neighborhood_radius
+        else:
+            # Default neighborhood radius is half the maximum of the number of rows and columns
+            self._sigma0 = max(config.n_rows, config.n_cols) / 2.0
+
+        # Initial learning rate
         self._lr0 = config.initial_learning_rate
 
-        # Weight matrix of shape (m, n, dim).
-        self._weights: np.ndarray = self._rng.normal(0.0, 1.0, size=(config.n_rows, config.n_cols, config.input_vector_dim)).astype(float)
+        # Weight matrix with shape (n_rows, n_cols, input_vector_dim).
+        self._weights: np.ndarray = self._rng.normal(loc=0.0, scale=1.0, size=(config.n_rows, config.n_cols, config.input_vector_dim)).astype(float)
 
-        # Precompute neuron coordinates (m, n, 2).
+        # Precompute neuron coordinates with shape (n_rows, n_cols, 2).
         xs, ys = np.meshgrid(np.arange(config.n_rows), np.arange(config.n_cols), indexing="ij")
+        
+        # Neuron coordinates with shape (n_rows, n_cols, 2).
         self._coords: np.ndarray = np.stack([xs, ys], axis=-1).astype(float)
 
     @property
